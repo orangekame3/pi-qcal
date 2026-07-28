@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
-export type QCalProviderType = "vllm" | "openai-compatible" | "ollama" | string;
+export type QCalProviderType = "vllm" | "openai-compatible" | "nvidia" | "ollama" | string;
 
 export interface QCalProfileConfig {
   provider?: QCalProviderType;
@@ -11,6 +11,9 @@ export interface QCalProfileConfig {
   apiKey?: string;
   apiKeyEnv?: string;
   responseFormatJson?: boolean;
+  temperature?: number;
+  maxTokens?: number;
+  enableThinking?: boolean;
 }
 
 export interface QCalConfig {
@@ -128,6 +131,17 @@ function applyEnvOverrides(config: QCalConfig): QCalConfig {
   }
   if (Object.keys(vllm).length > 1) next.profiles[vllmProfileName] = vllm;
 
+  const nvidiaProfileName = process.env.PI_QCAL_NVIDIA_PROFILE ?? "nvidia";
+  const nvidia = { provider: "nvidia", baseUrl: "https://integrate.api.nvidia.com/v1", ...(next.profiles[nvidiaProfileName] ?? {}) };
+  if (process.env.PI_QCAL_NVIDIA_BASE_URL) nvidia.baseUrl = process.env.PI_QCAL_NVIDIA_BASE_URL;
+  if (process.env.PI_QCAL_NVIDIA_MODEL) nvidia.model = process.env.PI_QCAL_NVIDIA_MODEL;
+  if (process.env.PI_QCAL_NVIDIA_API_KEY ?? process.env.NVIDIA_API_KEY) {
+    nvidia.apiKey = process.env.PI_QCAL_NVIDIA_API_KEY ?? process.env.NVIDIA_API_KEY;
+  }
+  if (process.env.PI_QCAL_NVIDIA_MAX_TOKENS) nvidia.maxTokens = Number(process.env.PI_QCAL_NVIDIA_MAX_TOKENS);
+  if (process.env.PI_QCAL_NVIDIA_TEMPERATURE) nvidia.temperature = Number(process.env.PI_QCAL_NVIDIA_TEMPERATURE);
+  if (Object.keys(nvidia).length > 2) next.profiles[nvidiaProfileName] = nvidia;
+
   const openaiProfileName = process.env.PI_QCAL_OPENAI_PROFILE ?? "openai";
   const openai = { provider: "openai-compatible", ...(next.profiles[openaiProfileName] ?? {}) };
   if (process.env.PI_QCAL_OPENAI_BASE_URL ?? process.env.OPENAI_BASE_URL) {
@@ -159,6 +173,9 @@ export function resolveProfileConfig(config: QCalConfig, profileName?: string, m
   model?: string;
   apiKey?: string;
   responseFormatJson?: boolean;
+  temperature?: number;
+  maxTokens?: number;
+  enableThinking?: boolean;
 } {
   const profile = profileName ?? config.defaultProfile ?? "local";
   const profileConfig = config.profiles[profile] ?? {};
@@ -171,6 +188,9 @@ export function resolveProfileConfig(config: QCalConfig, profileName?: string, m
     model: model ?? profileConfig.model,
     apiKey,
     responseFormatJson: profileConfig.responseFormatJson,
+    temperature: profileConfig.temperature,
+    maxTokens: profileConfig.maxTokens,
+    enableThinking: profileConfig.enableThinking,
   };
 }
 

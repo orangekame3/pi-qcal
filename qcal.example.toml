@@ -21,6 +21,15 @@ apiKeyEnv = "PI_QCAL_VLLM_API_KEY"
 # Some vLLM deployments have issues with OpenAI response_format JSON mode.
 responseFormatJson = false
 
+[profiles.nvidia]
+provider = "nvidia"
+baseUrl = "https://integrate.api.nvidia.com/v1"
+model = "nvidia/ising-calibration-1-35b-a3b"
+apiKeyEnv = "NVIDIA_API_KEY"
+temperature = 0.2
+maxTokens = 32768
+enableThinking = false
+
 [profiles.openai]
 provider = "openai-compatible"
 baseUrl = "https://api.openai.com/v1"

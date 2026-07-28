@@ -34,7 +34,12 @@ pi-qcal evaluator interface
    - The default mode is practical operational diagnosis, not benchmark reproduction.
    - Evaluators return a structured judgment rather than only free-form text.
 
-4. **Evidence, not automatic control**
+4. **VLM inspection as a separable primitive**
+   - Experiment discovery, execution, storage, and workflow orchestration belong outside `pi-qcal`.
+   - `pi-qcal` should provide the VLM/evaluator layer: render or accept images, combine them with evidence and prompts, call a provider, and normalize the result.
+   - Human-in-the-loop or hardware actions should be implemented by the surrounding agent/workflow.
+
+5. **Evidence, not automatic control**
    - Evaluation results can support calibration decisions.
    - They should not automatically commit parameters, apply candidates, or execute calibration tasks without explicit user confirmation.
 
@@ -241,6 +246,15 @@ apiKeyEnv = "PI_QCAL_VLLM_API_KEY"
 # Some vLLM deployments have issues with OpenAI response_format JSON mode.
 responseFormatJson = false
 
+[profiles.nvidia]
+provider = "nvidia"
+baseUrl = "https://integrate.api.nvidia.com/v1"
+model = "nvidia/ising-calibration-1-35b-a3b"
+apiKeyEnv = "NVIDIA_API_KEY"
+temperature = 0.2
+maxTokens = 32768
+enableThinking = false
+
 [profiles.openai]
 provider = "openai-compatible"
 baseUrl = "https://api.openai.com/v1"
@@ -265,6 +279,10 @@ Then set `baseUrl = "http://localhost:18000/v1"` in `qcal.toml`.
 ### `ollama`
 
 For local Ollama models. Text-only chat works through `/api/chat`; image support can be extended later for Ollama VLM-specific payloads.
+
+### `nvidia`
+
+For NVIDIA-hosted models through the OpenAI-compatible NVIDIA API endpoint. This mirrors the provider shape used by NVIDIA's calibration-agent blueprint while keeping experiment execution and storage outside `pi-qcal`.
 
 ### `openai-compatible`
 

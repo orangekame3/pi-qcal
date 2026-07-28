@@ -22,7 +22,7 @@ If no structured evidence is available, ask for local artifact paths or notes an
 
 ## Provider configuration
 
-Provider configuration is profile-based. A profile selects an endpoint/model, while `provider` names the serving backend such as `vllm`, `ollama`, or `openai-compatible`.
+Provider configuration is profile-based. A profile selects an endpoint/model, while `provider` names the serving backend such as `vllm`, `ollama`, `nvidia`, or `openai-compatible`.
 
 Example `qcal.toml`:
 
@@ -40,6 +40,15 @@ baseUrl = "http://localhost:18000/v1"
 model = "nvidia/Ising-Calibration-1-35B-A3B"
 apiKeyEnv = "PI_QCAL_VLLM_API_KEY"
 responseFormatJson = false
+
+[profiles.nvidia]
+provider = "nvidia"
+baseUrl = "https://integrate.api.nvidia.com/v1"
+model = "nvidia/ising-calibration-1-35b-a3b"
+apiKeyEnv = "NVIDIA_API_KEY"
+temperature = 0.2
+maxTokens = 32768
+enableThinking = false
 ```
 
 Use `/qcal-status` to show non-secret configuration status.

@@ -23,6 +23,7 @@ export interface ProviderCompletionRequest {
   messages: ModelMessage[];
   model?: string;
   temperature?: number;
+  maxTokens?: number;
   responseFormatJson?: boolean;
   figures?: CalibrationFigure[];
   evaluationRequest: EvaluationRequest;

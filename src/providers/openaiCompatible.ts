@@ -16,6 +16,7 @@ export interface OpenAICompatibleProviderOptions {
   apiKey?: string;
   model: string;
   defaultTemperature?: number;
+  defaultMaxTokens?: number;
   responseFormatJson?: boolean;
 }
 
@@ -85,6 +86,7 @@ export function createOpenAICompatibleProvider(options: OpenAICompatibleProvider
           model: request.model ?? options.model,
           messages,
           temperature: request.temperature ?? options.defaultTemperature ?? 0,
+          max_tokens: request.maxTokens ?? options.defaultMaxTokens,
           ...(request.responseFormatJson && options.responseFormatJson !== false ? { response_format: { type: "json_object" } } : {}),
         }),
       });
@@ -128,7 +130,10 @@ function createOllamaProvider(options: OpenAICompatibleProviderOptions): QCalPro
             content: typeof message.content === "string" ? message.content : message.content.map((part) => part.type === "text" ? part.text : "[image]").join("\n"),
           })),
           stream: false,
-          options: { temperature: request.temperature ?? options.defaultTemperature ?? 0 },
+          options: {
+            temperature: request.temperature ?? options.defaultTemperature ?? 0,
+            num_predict: request.maxTokens ?? options.defaultMaxTokens,
+          },
         }),
       });
 
@@ -164,11 +169,13 @@ export function createProviderFromConfig(profileName?: string, model?: string, c
       name: `${resolved.profile}/ollama`,
       baseUrl: resolved.baseUrl,
       model: resolved.model,
+      defaultTemperature: resolved.temperature,
+      defaultMaxTokens: resolved.maxTokens,
       responseFormatJson: resolved.responseFormatJson,
     });
   }
 
-  if (resolved.provider !== "vllm" && resolved.provider !== "openai-compatible") {
+  if (resolved.provider !== "vllm" && resolved.provider !== "openai-compatible" && resolved.provider !== "nvidia") {
     throw new Error(`Unsupported pi-qcal provider '${resolved.provider}' for profile '${resolved.profile}'.`);
   }
 
@@ -177,6 +184,8 @@ export function createProviderFromConfig(profileName?: string, model?: string, c
     baseUrl: resolved.baseUrl,
     apiKey: resolved.apiKey,
     model: resolved.model,
+    defaultTemperature: resolved.temperature,
+    defaultMaxTokens: resolved.maxTokens,
     responseFormatJson: resolved.responseFormatJson,
   });
 }
