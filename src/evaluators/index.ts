@@ -37,9 +37,12 @@ function numberRecord(value: unknown): Record<string, number> | undefined {
 
 function inferDecisionFromText(text: string): EvaluationDecision {
   const lower = text.toLowerCase();
-  if (/\b(pass|passed|success|successful|usable)\b/.test(lower)) return "pass";
-  if (/\b(fail|failed|failure|unusable|no signal)\b/.test(lower)) return "fail";
-  if (/\b(warning|marginal|suboptimal|unreliable|needs attention)\b/.test(lower)) return "warning";
+  // Check negative outcomes first; calibration reports often contain phrases like
+  // "no usable parameters", which should not be classified as pass just because
+  // they contain the word "usable".
+  if (/\b(fail|failed|failure|unusable|no signal|no usable|cannot extract|no measurable difference)\b/.test(lower)) return "fail";
+  if (/\b(warning|marginal|suboptimal|unreliable|needs attention|treat with caution)\b/.test(lower)) return "warning";
+  if (/\b(pass|passed|success|successful)\b/.test(lower)) return "pass";
   return "unknown";
 }
 
