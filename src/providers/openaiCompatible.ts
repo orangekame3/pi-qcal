@@ -20,6 +20,11 @@ export interface OpenAICompatibleProviderOptions {
   responseFormatJson?: boolean;
 }
 
+function dataUrlBase64(url: string): string | undefined {
+  const match = url.match(/^data:[^;]+;base64,(.+)$/);
+  return match?.[1];
+}
+
 function guessMimeType(path: string): string {
   const ext = extname(path).toLowerCase();
   if (ext === ".png") return "image/png";
@@ -119,16 +124,28 @@ function createOllamaProvider(options: OpenAICompatibleProviderOptions): QCalPro
   return {
     name: providerName,
     async complete(request: ProviderCompletionRequest, signal?: AbortSignal): Promise<ProviderCompletionResult> {
+      const messages = await attachFigures(request.messages, request.figures);
+      const ollamaMessages = messages.map((message) => {
+        if (typeof message.content === "string") return { role: message.role, content: message.content };
+        const images: string[] = [];
+        const text = message.content
+          .map((part) => {
+            if (part.type === "text") return part.text;
+            const base64 = dataUrlBase64(part.image_url.url);
+            if (base64) images.push(base64);
+            return part.image_url.url.startsWith("data:") ? "[image]" : `[image_url: ${part.image_url.url}]`;
+          })
+          .join("\n");
+        return { role: message.role, content: text, ...(images.length ? { images } : {}) };
+      });
+
       const response = await fetch(`${baseUrl}/api/chat`, {
         method: "POST",
         signal,
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           model: request.model ?? options.model,
-          messages: request.messages.map((message) => ({
-            role: message.role,
-            content: typeof message.content === "string" ? message.content : message.content.map((part) => part.type === "text" ? part.text : "[image]").join("\n"),
-          })),
+          messages: ollamaMessages,
           stream: false,
           options: {
             temperature: request.temperature ?? options.defaultTemperature ?? 0,

@@ -36,7 +36,8 @@ pi-qcal evaluator interface
 
 4. **VLM inspection as a separable primitive**
    - Experiment discovery, execution, storage, and workflow orchestration belong outside `pi-qcal`.
-   - `pi-qcal` should provide the VLM/evaluator layer: render or accept images, combine them with evidence and prompts, call a provider, and normalize the result.
+   - `pi-qcal` should provide the VLM/evaluator layer: accept images or structured plot artifacts, combine them with evidence and prompts, call a provider, and normalize the result.
+   - Local Plotly JSON artifacts are preserved as structured figure data; image files are sent as VLM image inputs when the provider supports them.
    - Human-in-the-loop or hardware actions should be implemented by the surrounding agent/workflow.
 
 5. **Evidence, not automatic control**
@@ -278,7 +279,7 @@ Then set `baseUrl = "http://localhost:18000/v1"` in `qcal.toml`.
 
 ### `ollama`
 
-For local Ollama models. Text-only chat works through `/api/chat`; image support can be extended later for Ollama VLM-specific payloads.
+For local Ollama models through `/api/chat`. Local image files are sent through Ollama's `images` field when present.
 
 ### `nvidia`
 

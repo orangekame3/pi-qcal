@@ -29,11 +29,31 @@ function modePrompt(mode: EvaluationMode | undefined): string {
   }
 }
 
+function figureContext(request: EvaluationRequest): string | undefined {
+  const figures = request.evidence.figures;
+  if (!figures?.length) return undefined;
+  return [
+    `Attached/available figures: ${figures.length}`,
+    ...figures.map((figure, index) => {
+      const fields = [
+        `#${index + 1}`,
+        figure.caption ? `caption=${figure.caption}` : undefined,
+        figure.role ? `role=${figure.role}` : undefined,
+        figure.path ? `path=${figure.path}` : undefined,
+        figure.url ? `url=${figure.url}` : undefined,
+        figure.data ? "has structured figure data" : undefined,
+      ].filter(Boolean);
+      return `- ${fields.join("; ")}`;
+    }),
+  ].join("\n");
+}
+
 export function buildUserPrompt(request: EvaluationRequest): string {
   const mode = request.rubric?.mode ?? "operational_diagnosis";
   const parts = [
     `Evaluator: ${request.evaluator}`,
     modePrompt(mode),
+    figureContext(request),
     request.rubric?.familyBackground ? `Experiment-family background:\n${request.rubric.familyBackground}` : undefined,
     request.rubric?.allowedLabels ? `Allowed labels/statuses:\n${jsonForPrompt(request.rubric.allowedLabels)}` : undefined,
     request.rubric?.extractionSchema ? `Extraction schema:\n${jsonForPrompt(request.rubric.extractionSchema)}` : undefined,

@@ -18,6 +18,16 @@ function guessMimeType(path: string): string | undefined {
   return undefined;
 }
 
+function looksLikePlotlyFigure(value: unknown): boolean {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      Array.isArray((value as any).data) &&
+      typeof (value as any).layout === "object",
+  );
+}
+
 async function readJson(path: string): Promise<unknown> {
   const text = await readFile(path, "utf8");
   if (extname(path).toLowerCase() === ".jsonl") {
@@ -44,7 +54,11 @@ export async function buildLocalEvidence(input: LocalEvidenceInput): Promise<Cal
   for (const path of input.files ?? []) {
     const ext = extname(path).toLowerCase();
     if (JSON_EXTENSIONS.has(ext)) {
-      resultJson[basename(path)] = await readJson(path);
+      const json = await readJson(path);
+      resultJson[basename(path)] = json;
+      if (looksLikePlotlyFigure(json)) {
+        figures.push({ path, mimeType: "application/json", role: "plotly", data: json });
+      }
     } else if (TEXT_EXTENSIONS.has(ext)) {
       logs.push(`--- ${path} ---\n${await readFile(path, "utf8")}`);
     } else if (IMAGE_EXTENSIONS.has(ext)) {
