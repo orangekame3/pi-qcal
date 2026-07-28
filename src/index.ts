@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { buildLocalEvidence } from "./adapters/local.ts";
-import { loadQCalConfig, resolveProviderConfig } from "./config.ts";
+import { loadQCalConfig, resolveProfileConfig } from "./config.ts";
 import { evaluateWithProvider } from "./evaluators/index.ts";
 import { createProviderFromConfig } from "./providers/openaiCompatible.ts";
 import type { EvaluationRequest } from "./schema.ts";
@@ -13,7 +13,7 @@ import {
 } from "./tools/schemas.ts";
 
 async function runEvaluation(request: EvaluationRequest, cwd: string, signal?: AbortSignal) {
-  const provider = createProviderFromConfig(request.provider, request.model, cwd);
+  const provider = createProviderFromConfig(request.profile ?? request.provider, request.model, cwd);
   return evaluateWithProvider(request, provider, signal);
 }
 
@@ -34,6 +34,7 @@ export default function piQcalExtension(pi: ExtensionAPI) {
         evidence: params.evidence,
         rubric: params.rubric,
         prompt: params.prompt,
+        profile: params.profile,
         provider: params.provider,
         model: params.model,
       };
@@ -62,6 +63,7 @@ export default function piQcalExtension(pi: ExtensionAPI) {
         evidence,
         rubric: params.rubric,
         prompt: params.prompt,
+        profile: params.profile,
         provider: params.provider,
         model: params.model,
       };
@@ -77,12 +79,13 @@ export default function piQcalExtension(pi: ExtensionAPI) {
     description: "Show pi-qcal provider configuration status without exposing secrets.",
     handler: async (_args, ctx) => {
       const config = loadQCalConfig(ctx.cwd);
-      const provider = config.defaultProvider ?? "openai-compatible";
-      const resolved = resolveProviderConfig(config, provider);
+      const profile = config.defaultProfile ?? "local";
+      const resolved = resolveProfileConfig(config, profile);
       ctx.ui.notify(
         [
           `pi-qcal config: ${config.path ?? "env/defaults only"}`,
-          `pi-qcal provider: ${provider}`,
+          `pi-qcal profile: ${profile}`,
+          `provider: ${resolved.provider}`,
           `base url: ${resolved.baseUrl ? "configured" : "missing"}`,
           `model: ${resolved.model ?? "missing"}`,
           `api key: ${resolved.apiKey ? "configured" : "missing"}`,

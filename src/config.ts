@@ -2,7 +2,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
-export interface QCalProviderConfig {
+export type QCalProviderType = "vllm" | "openai-compatible" | "ollama" | string;
+
+export interface QCalProfileConfig {
+  provider?: QCalProviderType;
   baseUrl?: string;
   model?: string;
   apiKey?: string;
@@ -11,8 +14,8 @@ export interface QCalProviderConfig {
 }
 
 export interface QCalConfig {
-  defaultProvider?: string;
-  providers: Record<string, QCalProviderConfig>;
+  defaultProfile?: string;
+  profiles: Record<string, QCalProfileConfig>;
   path?: string;
 }
 
@@ -71,20 +74,33 @@ function candidateConfigPaths(cwd: string): string[] {
 }
 
 export function loadQCalConfig(cwd = process.cwd()): QCalConfig {
-  const config: QCalConfig = { providers: {} };
+  const config: QCalConfig = { profiles: {} };
 
   for (const path of candidateConfigPaths(cwd)) {
     const resolved = resolve(path);
     if (!existsSync(resolved)) continue;
     const parsed = parseTomlSubset(readFileSync(resolved, "utf8"));
-    config.defaultProvider = typeof parsed.defaultProvider === "string" ? parsed.defaultProvider : config.defaultProvider;
-    if (parsed.providers && typeof parsed.providers === "object") {
-      for (const [name, provider] of Object.entries(parsed.providers)) {
-        if (provider && typeof provider === "object") {
-          config.providers[name] = { ...(provider as QCalProviderConfig) };
+
+    // Preferred schema.
+    config.defaultProfile = typeof parsed.defaultProfile === "string" ? parsed.defaultProfile : config.defaultProfile;
+    if (parsed.profiles && typeof parsed.profiles === "object") {
+      for (const [name, profile] of Object.entries(parsed.profiles)) {
+        if (profile && typeof profile === "object") {
+          config.profiles[name] = { ...(profile as QCalProfileConfig) };
         }
       }
     }
+
+    // Backward-compatible read of the short-lived defaultProvider/providers schema.
+    config.defaultProfile ??= typeof parsed.defaultProvider === "string" ? parsed.defaultProvider : undefined;
+    if (parsed.providers && typeof parsed.providers === "object") {
+      for (const [name, profile] of Object.entries(parsed.providers)) {
+        if (profile && typeof profile === "object" && !config.profiles[name]) {
+          config.profiles[name] = { provider: name, ...(profile as QCalProfileConfig) };
+        }
+      }
+    }
+
     config.path = resolved;
     break;
   }
@@ -95,21 +111,25 @@ export function loadQCalConfig(cwd = process.cwd()): QCalConfig {
 function applyEnvOverrides(config: QCalConfig): QCalConfig {
   const next: QCalConfig = {
     ...config,
-    providers: { ...config.providers },
+    profiles: { ...config.profiles },
   };
 
-  if (process.env.PI_QCAL_PROVIDER) next.defaultProvider = process.env.PI_QCAL_PROVIDER;
+  if (process.env.PI_QCAL_PROFILE) next.defaultProfile = process.env.PI_QCAL_PROFILE;
+  // Backward-compatible alias.
+  if (process.env.PI_QCAL_PROVIDER && !process.env.PI_QCAL_PROFILE) next.defaultProfile = process.env.PI_QCAL_PROVIDER;
 
-  const spark = { ...(next.providers["spark-vllm"] ?? {}) };
-  if (process.env.PI_QCAL_VLLM_BASE_URL) spark.baseUrl = process.env.PI_QCAL_VLLM_BASE_URL;
-  if (process.env.PI_QCAL_VLLM_MODEL) spark.model = process.env.PI_QCAL_VLLM_MODEL;
-  if (process.env.PI_QCAL_VLLM_API_KEY) spark.apiKey = process.env.PI_QCAL_VLLM_API_KEY;
+  const vllmProfileName = process.env.PI_QCAL_VLLM_PROFILE ?? "spark-ising";
+  const vllm = { provider: "vllm", ...(next.profiles[vllmProfileName] ?? {}) };
+  if (process.env.PI_QCAL_VLLM_BASE_URL) vllm.baseUrl = process.env.PI_QCAL_VLLM_BASE_URL;
+  if (process.env.PI_QCAL_VLLM_MODEL) vllm.model = process.env.PI_QCAL_VLLM_MODEL;
+  if (process.env.PI_QCAL_VLLM_API_KEY) vllm.apiKey = process.env.PI_QCAL_VLLM_API_KEY;
   if (process.env.PI_QCAL_VLLM_RESPONSE_FORMAT_JSON) {
-    spark.responseFormatJson = process.env.PI_QCAL_VLLM_RESPONSE_FORMAT_JSON === "true";
+    vllm.responseFormatJson = process.env.PI_QCAL_VLLM_RESPONSE_FORMAT_JSON === "true";
   }
-  if (Object.keys(spark).length) next.providers["spark-vllm"] = spark;
+  if (Object.keys(vllm).length > 1) next.profiles[vllmProfileName] = vllm;
 
-  const openai = { ...(next.providers["openai-compatible"] ?? {}) };
+  const openaiProfileName = process.env.PI_QCAL_OPENAI_PROFILE ?? "openai";
+  const openai = { provider: "openai-compatible", ...(next.profiles[openaiProfileName] ?? {}) };
   if (process.env.PI_QCAL_OPENAI_BASE_URL ?? process.env.OPENAI_BASE_URL) {
     openai.baseUrl = process.env.PI_QCAL_OPENAI_BASE_URL ?? process.env.OPENAI_BASE_URL;
   }
@@ -119,27 +139,40 @@ function applyEnvOverrides(config: QCalConfig): QCalConfig {
   if (process.env.PI_QCAL_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY) {
     openai.apiKey = process.env.PI_QCAL_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
   }
-  if (Object.keys(openai).length) next.providers["openai-compatible"] = openai;
+  if (Object.keys(openai).length > 1) next.profiles[openaiProfileName] = openai;
+
+  const ollamaProfileName = process.env.PI_QCAL_OLLAMA_PROFILE ?? "ollama";
+  const ollama = { provider: "ollama", ...(next.profiles[ollamaProfileName] ?? {}) };
+  if (process.env.PI_QCAL_OLLAMA_BASE_URL ?? process.env.OLLAMA_HOST) {
+    ollama.baseUrl = process.env.PI_QCAL_OLLAMA_BASE_URL ?? process.env.OLLAMA_HOST;
+  }
+  if (process.env.PI_QCAL_OLLAMA_MODEL) ollama.model = process.env.PI_QCAL_OLLAMA_MODEL;
+  if (Object.keys(ollama).length > 1) next.profiles[ollamaProfileName] = ollama;
 
   return next;
 }
 
-export function resolveProviderConfig(config: QCalConfig, providerName?: string, model?: string): {
-  name: string;
+export function resolveProfileConfig(config: QCalConfig, profileName?: string, model?: string): {
+  profile: string;
+  provider: QCalProviderType;
   baseUrl?: string;
   model?: string;
   apiKey?: string;
   responseFormatJson?: boolean;
 } {
-  const name = providerName ?? config.defaultProvider ?? "openai-compatible";
-  const provider = config.providers[name] ?? {};
-  const apiKey = provider.apiKey ?? (provider.apiKeyEnv ? process.env[provider.apiKeyEnv] : undefined);
+  const profile = profileName ?? config.defaultProfile ?? "local";
+  const profileConfig = config.profiles[profile] ?? {};
+  const apiKey = profileConfig.apiKey ?? (profileConfig.apiKeyEnv ? process.env[profileConfig.apiKeyEnv] : undefined);
 
   return {
-    name,
-    baseUrl: provider.baseUrl,
-    model: model ?? provider.model,
+    profile,
+    provider: profileConfig.provider ?? profile,
+    baseUrl: profileConfig.baseUrl,
+    model: model ?? profileConfig.model,
     apiKey,
-    responseFormatJson: provider.responseFormatJson,
+    responseFormatJson: profileConfig.responseFormatJson,
   };
 }
+
+// Backward-compatible export name for existing imports.
+export const resolveProviderConfig = resolveProfileConfig;

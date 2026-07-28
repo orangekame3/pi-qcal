@@ -22,25 +22,27 @@ If no structured evidence is available, ask for local artifact paths or notes an
 
 ## Provider configuration
 
-The first target provider is an OpenAI-compatible vLLM endpoint serving calibration-evaluation models such as `ising-calibration`.
+Provider configuration is profile-based. A profile selects an endpoint/model, while `provider` names the serving backend such as `vllm`, `ollama`, or `openai-compatible`.
 
-Useful environment variables:
+Example `qcal.toml`:
 
-```bash
-PI_QCAL_PROVIDER=spark-vllm
-PI_QCAL_VLLM_BASE_URL=http://localhost:8000/v1
-PI_QCAL_VLLM_MODEL=ising-calibration
+```toml
+defaultProfile = "local"
+
+[profiles.local]
+provider = "ollama"
+baseUrl = "http://localhost:11434"
+model = "llava:latest"
+
+[profiles.spark-ising]
+provider = "vllm"
+baseUrl = "http://localhost:18000/v1"
+model = "nvidia/Ising-Calibration-1-35B-A3B"
+apiKeyEnv = "PI_QCAL_VLLM_API_KEY"
+responseFormatJson = false
 ```
 
-For generic endpoints:
-
-```bash
-PI_QCAL_OPENAI_BASE_URL=http://localhost:8000/v1
-PI_QCAL_OPENAI_API_KEY=...
-PI_QCAL_OPENAI_MODEL=...
-```
-
-Use `/qcal-status` to show non-secret provider status.
+Use `/qcal-status` to show non-secret configuration status.
 
 ## Safety
 

@@ -116,6 +116,7 @@ export interface EvaluationRequest {
   evaluator: string;
   evidence: CalibrationEvidence;
   rubric?: EvaluationRubric;
+  profile?: string;
   prompt?: string;
   options?: Record<string, unknown>;
 }
@@ -188,7 +189,7 @@ Evaluate a provider-neutral evidence bundle.
 {
   evaluator: "ising-calibration" | "generic-vlm" | string,
   evidence: CalibrationEvidence,
-  provider?: "spark-vllm" | "openai-compatible" | string,
+  profile?: "local" | "spark-ising" | "openai" | string,
   model?: string,
   prompt?: string
 }
@@ -204,14 +205,16 @@ Evaluate local artifacts without depending on any external evidence store.
   figures?: string[],
   notes?: string,
   evaluator: string,
-  provider?: string,
+  profile?: string,
   model?: string
 }
 ```
 
 ## Provider configuration
 
-`pi-qcal` can be configured with TOML. The first existing file is used:
+`pi-qcal` can be configured with TOML profiles. A profile names an endpoint/model, while `provider` names the serving backend such as `vllm`, `ollama`, or `openai-compatible`.
+
+The first existing file is used:
 
 1. `PI_QCAL_CONFIG=/path/to/qcal.toml`
 2. `.pi/qcal.toml` in the current project
@@ -223,26 +226,33 @@ Environment variables still work and override file values, which is useful for s
 Example:
 
 ```toml
-defaultProvider = "spark-vllm"
+defaultProfile = "local"
 
-[providers.spark-vllm]
+[profiles.local]
+provider = "ollama"
+baseUrl = "http://localhost:11434"
+model = "llava:latest"
+
+[profiles.spark-ising]
+provider = "vllm"
 baseUrl = "http://localhost:18000/v1"
 model = "nvidia/Ising-Calibration-1-35B-A3B"
 apiKeyEnv = "PI_QCAL_VLLM_API_KEY"
 # Some vLLM deployments have issues with OpenAI response_format JSON mode.
 responseFormatJson = false
 
-[providers.openai-compatible]
-baseUrl = "http://localhost:8000/v1"
-model = "your-model"
-apiKeyEnv = "PI_QCAL_OPENAI_API_KEY"
+[profiles.openai]
+provider = "openai-compatible"
+baseUrl = "https://api.openai.com/v1"
+model = "gpt-4o-mini"
+apiKeyEnv = "OPENAI_API_KEY"
 ```
 
 See `qcal.example.toml` for a copyable template.
 
-### `spark-vllm`
+### `vllm`
 
-For calibration-evaluation models served by vLLM on an SSH-accessible Spark host.
+For calibration-evaluation models served by vLLM, including an SSH-accessible Spark host.
 
 If the vLLM server is only reachable from the remote host, create a tunnel such as:
 
@@ -251,6 +261,10 @@ ssh -N -L 18000:localhost:8000 spark
 ```
 
 Then set `baseUrl = "http://localhost:18000/v1"` in `qcal.toml`.
+
+### `ollama`
+
+For local Ollama models. Text-only chat works through `/api/chat`; image support can be extended later for Ollama VLM-specific payloads.
 
 ### `openai-compatible`
 

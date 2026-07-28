@@ -74,7 +74,8 @@ export const EvaluationRequestSchema = Type.Object({
   evidence: CalibrationEvidenceSchema,
   rubric: Type.Optional(EvaluationRubricSchema),
   prompt: Type.Optional(Type.String()),
-  provider: Type.Optional(Type.String()),
+  profile: Type.Optional(Type.String()),
+  provider: Type.Optional(Type.String({ description: "Deprecated alias for profile" })),
   model: Type.Optional(Type.String()),
   options: Type.Optional(UnknownRecord),
 });

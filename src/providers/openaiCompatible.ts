@@ -7,7 +7,7 @@ import type {
   ProviderCompletionResult,
   QCalProvider,
 } from "./types.ts";
-import { loadQCalConfig, resolveProviderConfig } from "../config.ts";
+import { loadQCalConfig, resolveProfileConfig } from "../config.ts";
 import type { CalibrationFigure } from "../schema.ts";
 
 export interface OpenAICompatibleProviderOptions {
@@ -110,19 +110,70 @@ export function createOpenAICompatibleProvider(options: OpenAICompatibleProvider
   };
 }
 
-export function createProviderFromConfig(providerName?: string, model?: string, cwd?: string): QCalProvider {
+function createOllamaProvider(options: OpenAICompatibleProviderOptions): QCalProvider {
+  const baseUrl = options.baseUrl.replace(/\/$/, "");
+  const providerName = options.name ?? "ollama";
+
+  return {
+    name: providerName,
+    async complete(request: ProviderCompletionRequest, signal?: AbortSignal): Promise<ProviderCompletionResult> {
+      const response = await fetch(`${baseUrl}/api/chat`, {
+        method: "POST",
+        signal,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          model: request.model ?? options.model,
+          messages: request.messages.map((message) => ({
+            role: message.role,
+            content: typeof message.content === "string" ? message.content : message.content.map((part) => part.type === "text" ? part.text : "[image]").join("\n"),
+          })),
+          stream: false,
+          options: { temperature: request.temperature ?? options.defaultTemperature ?? 0 },
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`${providerName} request failed: HTTP ${response.status} ${text}`);
+      }
+
+      const json = (await response.json()) as any;
+      const text = json?.message?.content;
+      if (typeof text !== "string") {
+        throw new Error(`${providerName} response did not contain message.content`);
+      }
+
+      return { provider: providerName, model: request.model ?? options.model, text, raw: json };
+    },
+  };
+}
+
+export function createProviderFromConfig(profileName?: string, model?: string, cwd?: string): QCalProvider {
   const config = loadQCalConfig(cwd);
-  const resolved = resolveProviderConfig(config, providerName, model);
+  const resolved = resolveProfileConfig(config, profileName, model);
 
   if (!resolved.baseUrl) {
-    throw new Error(`Missing baseUrl for pi-qcal provider '${resolved.name}'. Configure it in qcal.toml or environment variables.`);
+    throw new Error(`Missing baseUrl for pi-qcal profile '${resolved.profile}'. Configure it in qcal.toml or environment variables.`);
   }
   if (!resolved.model) {
-    throw new Error(`Missing model for pi-qcal provider '${resolved.name}'. Configure it in qcal.toml or environment variables.`);
+    throw new Error(`Missing model for pi-qcal profile '${resolved.profile}'. Configure it in qcal.toml or environment variables.`);
+  }
+
+  if (resolved.provider === "ollama") {
+    return createOllamaProvider({
+      name: `${resolved.profile}/ollama`,
+      baseUrl: resolved.baseUrl,
+      model: resolved.model,
+      responseFormatJson: resolved.responseFormatJson,
+    });
+  }
+
+  if (resolved.provider !== "vllm" && resolved.provider !== "openai-compatible") {
+    throw new Error(`Unsupported pi-qcal provider '${resolved.provider}' for profile '${resolved.profile}'.`);
   }
 
   return createOpenAICompatibleProvider({
-    name: resolved.name,
+    name: `${resolved.profile}/${resolved.provider}`,
     baseUrl: resolved.baseUrl,
     apiKey: resolved.apiKey,
     model: resolved.model,
@@ -130,6 +181,6 @@ export function createProviderFromConfig(providerName?: string, model?: string, 
   });
 }
 
-export function createProviderFromEnv(providerName?: string, model?: string): QCalProvider {
-  return createProviderFromConfig(providerName, model);
+export function createProviderFromEnv(profileName?: string, model?: string): QCalProvider {
+  return createProviderFromConfig(profileName, model);
 }
