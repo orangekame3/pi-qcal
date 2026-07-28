@@ -209,39 +209,52 @@ Evaluate local artifacts without depending on any external evidence store.
 }
 ```
 
-## Provider targets
+## Provider configuration
+
+`pi-qcal` can be configured with TOML. The first existing file is used:
+
+1. `PI_QCAL_CONFIG=/path/to/qcal.toml`
+2. `.pi/qcal.toml` in the current project
+3. `qcal.toml` in the current project
+4. `~/.config/pi-qcal/config.toml`
+
+Environment variables still work and override file values, which is useful for secrets and CI.
+
+Example:
+
+```toml
+defaultProvider = "spark-vllm"
+
+[providers.spark-vllm]
+baseUrl = "http://localhost:18000/v1"
+model = "nvidia/Ising-Calibration-1-35B-A3B"
+apiKeyEnv = "PI_QCAL_VLLM_API_KEY"
+# Some vLLM deployments have issues with OpenAI response_format JSON mode.
+responseFormatJson = false
+
+[providers.openai-compatible]
+baseUrl = "http://localhost:8000/v1"
+model = "your-model"
+apiKeyEnv = "PI_QCAL_OPENAI_API_KEY"
+```
+
+See `qcal.example.toml` for a copyable template.
 
 ### `spark-vllm`
 
 For calibration-evaluation models served by vLLM on an SSH-accessible Spark host.
 
-Expected configuration:
-
-```bash
-PI_QCAL_SPARK_HOST=spark
-PI_QCAL_VLLM_BASE_URL=http://localhost:8000/v1
-PI_QCAL_VLLM_MODEL=ising-calibration
-# Optional: only set true if the vLLM server supports OpenAI response_format JSON mode reliably.
-PI_QCAL_VLLM_RESPONSE_FORMAT_JSON=false
-```
-
 If the vLLM server is only reachable from the remote host, create a tunnel such as:
 
 ```bash
 ssh -N -L 18000:localhost:8000 spark
-PI_QCAL_VLLM_BASE_URL=http://localhost:18000/v1
 ```
 
+Then set `baseUrl = "http://localhost:18000/v1"` in `qcal.toml`.
 
 ### `openai-compatible`
 
 For generic local or hosted VLM/LLM endpoints that expose an OpenAI-compatible API.
-
-```bash
-PI_QCAL_OPENAI_BASE_URL=http://localhost:8000/v1
-PI_QCAL_OPENAI_API_KEY=...
-PI_QCAL_OPENAI_MODEL=...
-```
 
 ## Safety
 

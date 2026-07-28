@@ -1,8 +1,9 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { buildLocalEvidence } from "./adapters/local.ts";
+import { loadQCalConfig, resolveProviderConfig } from "./config.ts";
 import { evaluateWithProvider } from "./evaluators/index.ts";
-import { createProviderFromEnv } from "./providers/openaiCompatible.ts";
-import type { CalibrationEvidence, EvaluationRequest } from "./schema.ts";
+import { createProviderFromConfig } from "./providers/openaiCompatible.ts";
+import type { EvaluationRequest } from "./schema.ts";
 import { formatEvaluationResult } from "./tools/format.ts";
 import {
   EvaluateBundleParamsSchema,
@@ -11,8 +12,8 @@ import {
   type EvaluateLocalParams,
 } from "./tools/schemas.ts";
 
-async function runEvaluation(request: EvaluationRequest, signal?: AbortSignal) {
-  const provider = createProviderFromEnv(request.provider, request.model);
+async function runEvaluation(request: EvaluationRequest, cwd: string, signal?: AbortSignal) {
+  const provider = createProviderFromConfig(request.provider, request.model, cwd);
   return evaluateWithProvider(request, provider, signal);
 }
 
@@ -36,7 +37,7 @@ export default function piQcalExtension(pi: ExtensionAPI) {
         provider: params.provider,
         model: params.model,
       };
-      const result = await runEvaluation(request, signal ?? ctx.signal);
+      const result = await runEvaluation(request, ctx.cwd, signal ?? ctx.signal);
       return {
         content: [{ type: "text", text: formatEvaluationResult(result) }],
         details: result,
@@ -64,7 +65,7 @@ export default function piQcalExtension(pi: ExtensionAPI) {
         provider: params.provider,
         model: params.model,
       };
-      const result = await runEvaluation(request, signal ?? ctx.signal);
+      const result = await runEvaluation(request, ctx.cwd, signal ?? ctx.signal);
       return {
         content: [{ type: "text", text: formatEvaluationResult(result) }],
         details: { result, evidence },
@@ -75,16 +76,16 @@ export default function piQcalExtension(pi: ExtensionAPI) {
   pi.registerCommand("qcal-status", {
     description: "Show pi-qcal provider configuration status without exposing secrets.",
     handler: async (_args, ctx) => {
-      const provider = process.env.PI_QCAL_PROVIDER ?? "openai-compatible";
-      const openaiBaseUrl = process.env.PI_QCAL_OPENAI_BASE_URL ?? process.env.OPENAI_BASE_URL;
-      const vllmBaseUrl = process.env.PI_QCAL_VLLM_BASE_URL;
-      const model = process.env.PI_QCAL_VLLM_MODEL ?? process.env.PI_QCAL_OPENAI_MODEL ?? process.env.OPENAI_MODEL;
+      const config = loadQCalConfig(ctx.cwd);
+      const provider = config.defaultProvider ?? "openai-compatible";
+      const resolved = resolveProviderConfig(config, provider);
       ctx.ui.notify(
         [
+          `pi-qcal config: ${config.path ?? "env/defaults only"}`,
           `pi-qcal provider: ${provider}`,
-          `openai base url: ${openaiBaseUrl ? "configured" : "missing"}`,
-          `vllm base url: ${vllmBaseUrl ? "configured" : "missing"}`,
-          `model: ${model ?? "missing"}`,
+          `base url: ${resolved.baseUrl ? "configured" : "missing"}`,
+          `model: ${resolved.model ?? "missing"}`,
+          `api key: ${resolved.apiKey ? "configured" : "missing"}`,
         ].join("\n"),
         "info",
       );

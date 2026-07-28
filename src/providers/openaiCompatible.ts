@@ -7,6 +7,7 @@ import type {
   ProviderCompletionResult,
   QCalProvider,
 } from "./types.ts";
+import { loadQCalConfig, resolveProviderConfig } from "../config.ts";
 import type { CalibrationFigure } from "../schema.ts";
 
 export interface OpenAICompatibleProviderOptions {
@@ -109,31 +110,26 @@ export function createOpenAICompatibleProvider(options: OpenAICompatibleProvider
   };
 }
 
-export function createProviderFromEnv(providerName?: string, model?: string): QCalProvider {
-  const selected = providerName ?? process.env.PI_QCAL_PROVIDER ?? "openai-compatible";
+export function createProviderFromConfig(providerName?: string, model?: string, cwd?: string): QCalProvider {
+  const config = loadQCalConfig(cwd);
+  const resolved = resolveProviderConfig(config, providerName, model);
 
-  if (selected === "spark-vllm") {
-    const baseUrl = process.env.PI_QCAL_VLLM_BASE_URL ?? process.env.PI_QCAL_OPENAI_BASE_URL;
-    const selectedModel = model ?? process.env.PI_QCAL_VLLM_MODEL ?? process.env.PI_QCAL_OPENAI_MODEL ?? "ising-calibration";
-    if (!baseUrl) throw new Error("PI_QCAL_VLLM_BASE_URL or PI_QCAL_OPENAI_BASE_URL is required for spark-vllm");
-    return createOpenAICompatibleProvider({
-      name: "spark-vllm",
-      baseUrl,
-      apiKey: process.env.PI_QCAL_VLLM_API_KEY ?? process.env.PI_QCAL_OPENAI_API_KEY,
-      model: selectedModel,
-      responseFormatJson: process.env.PI_QCAL_VLLM_RESPONSE_FORMAT_JSON === "true",
-    });
+  if (!resolved.baseUrl) {
+    throw new Error(`Missing baseUrl for pi-qcal provider '${resolved.name}'. Configure it in qcal.toml or environment variables.`);
+  }
+  if (!resolved.model) {
+    throw new Error(`Missing model for pi-qcal provider '${resolved.name}'. Configure it in qcal.toml or environment variables.`);
   }
 
-  const baseUrl = process.env.PI_QCAL_OPENAI_BASE_URL ?? process.env.OPENAI_BASE_URL;
-  const selectedModel = model ?? process.env.PI_QCAL_OPENAI_MODEL ?? process.env.OPENAI_MODEL;
-  if (!baseUrl) throw new Error("PI_QCAL_OPENAI_BASE_URL or OPENAI_BASE_URL is required");
-  if (!selectedModel) throw new Error("PI_QCAL_OPENAI_MODEL or OPENAI_MODEL is required");
-
   return createOpenAICompatibleProvider({
-    name: selected,
-    baseUrl,
-    apiKey: process.env.PI_QCAL_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY,
-    model: selectedModel,
+    name: resolved.name,
+    baseUrl: resolved.baseUrl,
+    apiKey: resolved.apiKey,
+    model: resolved.model,
+    responseFormatJson: resolved.responseFormatJson,
   });
+}
+
+export function createProviderFromEnv(providerName?: string, model?: string): QCalProvider {
+  return createProviderFromConfig(providerName, model);
 }
