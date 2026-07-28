@@ -8,18 +8,26 @@
 defaultProfile = "local"
 
 [profiles.local]
-provider = "ollama"
-baseUrl = "http://localhost:11434"
-model = "llava:latest"
-
-[profiles.spark-ising]
 provider = "vllm"
-baseUrl = "http://localhost:18000/v1"
+baseUrl = "http://localhost:8000/v1"
 model = "nvidia/Ising-Calibration-1-35B-A3B"
 # Prefer environment indirection for secrets instead of writing API keys here.
 apiKeyEnv = "PI_QCAL_VLLM_API_KEY"
 # Some vLLM deployments have issues with OpenAI response_format JSON mode.
 responseFormatJson = false
+
+# Example: the same local profile through an SSH tunnel to a remote vLLM server.
+[profiles.spark-ising]
+provider = "vllm"
+baseUrl = "http://localhost:18000/v1"
+model = "nvidia/Ising-Calibration-1-35B-A3B"
+apiKeyEnv = "PI_QCAL_VLLM_API_KEY"
+responseFormatJson = false
+
+[profiles.ollama]
+provider = "ollama"
+baseUrl = "http://localhost:11434"
+model = "llava:latest"
 
 [profiles.nvidia]
 provider = "nvidia"

@@ -30,9 +30,11 @@ Example `qcal.toml`:
 defaultProfile = "local"
 
 [profiles.local]
-provider = "ollama"
-baseUrl = "http://localhost:11434"
-model = "llava:latest"
+provider = "vllm"
+baseUrl = "http://localhost:8000/v1"
+model = "nvidia/Ising-Calibration-1-35B-A3B"
+apiKeyEnv = "PI_QCAL_VLLM_API_KEY"
+responseFormatJson = false
 
 [profiles.spark-ising]
 provider = "vllm"

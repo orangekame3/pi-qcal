@@ -235,10 +235,13 @@ Example:
 defaultProfile = "local"
 
 [profiles.local]
-provider = "ollama"
-baseUrl = "http://localhost:11434"
-model = "llava:latest"
+provider = "vllm"
+baseUrl = "http://localhost:8000/v1"
+model = "nvidia/Ising-Calibration-1-35B-A3B"
+apiKeyEnv = "PI_QCAL_VLLM_API_KEY"
+responseFormatJson = false
 
+# Example: the same local profile through an SSH tunnel to a remote vLLM server.
 [profiles.spark-ising]
 provider = "vllm"
 baseUrl = "http://localhost:18000/v1"
@@ -279,7 +282,7 @@ Then set `baseUrl = "http://localhost:18000/v1"` in `qcal.toml`.
 
 ### `ollama`
 
-For local Ollama models through `/api/chat`. Local image files are sent through Ollama's `images` field when present.
+For Ollama models through `/api/chat`. Local image files are sent through Ollama's `images` field when present.
 
 ### `nvidia`
 

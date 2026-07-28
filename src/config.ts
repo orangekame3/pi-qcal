@@ -22,6 +22,16 @@ export interface QCalConfig {
   path?: string;
 }
 
+const DEFAULT_PROFILES: Record<string, QCalProfileConfig> = {
+  local: {
+    provider: "vllm",
+    baseUrl: "http://localhost:8000/v1",
+    model: "nvidia/Ising-Calibration-1-35B-A3B",
+    apiKeyEnv: "PI_QCAL_VLLM_API_KEY",
+    responseFormatJson: false,
+  },
+};
+
 function parseValue(raw: string): unknown {
   const value = raw.trim();
   if (value === "true") return true;
@@ -77,7 +87,7 @@ function candidateConfigPaths(cwd: string): string[] {
 }
 
 export function loadQCalConfig(cwd = process.cwd()): QCalConfig {
-  const config: QCalConfig = { profiles: {} };
+  const config: QCalConfig = { defaultProfile: "local", profiles: { ...DEFAULT_PROFILES } };
 
   for (const path of candidateConfigPaths(cwd)) {
     const resolved = resolve(path);
@@ -121,7 +131,7 @@ function applyEnvOverrides(config: QCalConfig): QCalConfig {
   // Backward-compatible alias.
   if (process.env.PI_QCAL_PROVIDER && !process.env.PI_QCAL_PROFILE) next.defaultProfile = process.env.PI_QCAL_PROVIDER;
 
-  const vllmProfileName = process.env.PI_QCAL_VLLM_PROFILE ?? "spark-ising";
+  const vllmProfileName = process.env.PI_QCAL_VLLM_PROFILE ?? "local";
   const vllm = { provider: "vllm", ...(next.profiles[vllmProfileName] ?? {}) };
   if (process.env.PI_QCAL_VLLM_BASE_URL) vllm.baseUrl = process.env.PI_QCAL_VLLM_BASE_URL;
   if (process.env.PI_QCAL_VLLM_MODEL) vllm.model = process.env.PI_QCAL_VLLM_MODEL;
