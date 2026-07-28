@@ -19,7 +19,9 @@
     ]
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "qcaleval:prepare": "scripts/prepare-qcaleval-smoke.sh",
+    "qcaleval:smoke": "node --experimental-strip-types scripts/qcaleval-smoke.ts"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",

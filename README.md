@@ -292,6 +292,30 @@ For NVIDIA-hosted models through the OpenAI-compatible NVIDIA API endpoint. This
 
 For generic local or hosted VLM/LLM endpoints that expose an OpenAI-compatible API.
 
+## QCalEval smoke test
+
+A small optional smoke test can download three public samples from `nvidia/QCalEval` and run them through the configured `local` profile.
+
+```bash
+npm run qcaleval:prepare
+
+# Example when vLLM is reachable through an SSH tunnel:
+ssh -N -L 18000:localhost:8000 spark
+export PI_QCAL_PROFILE=local
+export PI_QCAL_VLLM_BASE_URL=http://localhost:18000/v1
+export PI_QCAL_VLLM_API_KEY=...
+export PI_QCAL_VLLM_MODEL=nvidia/Ising-Calibration-1-35B-A3B
+npm run qcaleval:smoke
+```
+
+The smoke cases are intentionally tiny:
+
+- `drag_success_a` should classify as `pass`.
+- `drag_failure_position_far_offset_a` should classify as `warning` or `fail`.
+- `gmm_failure_no_signal_a` should classify as `fail`.
+
+Results are written to `/tmp/pi-qcal-qcaleval-smoke-results.json` by default.
+
 ## Safety
 
 `pi-qcal` is an evaluation extension. It should not directly mutate calibration parameters or execute experiments. If integrated with an external operational workflow, any hardware actions should remain confirmation-gated by that workflow.
